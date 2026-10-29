@@ -1,55 +1,66 @@
-# Clipper HTA App
+# Clipper
 
-**Clipper** is a simple HTA (HTML Application) that monitors your clipboard for email addresses and replaces them with a predefined value. This can be useful for quickly obfuscating or altering email addresses in text copied from various sources.
+**A clipboard watcher for Windows.** Leave it running and it rewrites copied
+text that matches a pattern. Built for swapping email addresses out of copied
+content, but the pattern is yours to change.
 
-## Table of Contents
+Two versions, same behaviour:
 
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [How It Works](#how-it-works)
-- [License](#license)
+| File | Runtime | Notes |
+| --- | --- | --- |
+| `index.hta` | HTA + JScript + WSH | Original 2023 version. Window-less. |
+| `clipper.vbs` | VBScript + WSH | Console or double-click. No browser engine. |
 
 ## Usage
 
-1. Download the `Clipper.hta` file.
-2. Double-click on the `Clipper.hta` file to run the application.
+VBScript version:
+
+```bat
+cscript //nologo clipper.vbs        :: run and keep watching
+cscript //nologo clipper.vbs /once  :: one pass, then exit
+```
+
+Or double-click `clipper.vbs` to run it windowed. Stop it from Task Manager.
+
+HTA version: double-click `index.hta`.
 
 ## Configuration
 
-Before using Clipper, you should configure it to suit your needs. Open the `Clipper.hta` file in a text editor and locate the following configuration section:
+Both files keep their settings in a marked block near the top. Edit and re-run;
+there is nothing to compile.
 
-```javascript
-// #START-CONFIG
-//      ### REPLACE THE objRegEx value with your regex
-var objRegEx = new RegExp("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,4}\\b", "ig");
-//      ### REPLACE your@value.sex with your text to put into the clipboard
-var toclip = "your@value.corn"
-// #END-CONFIG
+```vbscript
+' #START-CONFIG
+Const PATTERN     = "\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}\b"
+Const REPLACEMENT = "your@value.corn"
+Const INTERVAL_MS = 2500
+' #END-CONFIG
 ```
 
-- Replace the `objRegEx` regular expression with the pattern you want to search for in the clipboard text.
-- Replace the `toclip` variable with the text you want to put into the clipboard as a replacement.
+- `PATTERN` is a VBScript `RegExp` pattern, matched case-insensitively.
+- `REPLACEMENT` is what matched text becomes.
+- `INTERVAL_MS` is how often the clipboard is checked.
 
-Save the file after making your changes.
+## How it works
 
-## How It Works
+1. Poll the clipboard every 2.5 seconds via `WScript.Shell` and PowerShell.
+2. Run the pattern over the text.
+3. If anything matched, write the changed text back.
 
-Clipper is an HTML Application (HTA) that uses JavaScript and Windows Scripting Host (WSH) to monitor your clipboard. Here's how it works:
+The clipboard is only written when the text actually changes, so the watcher
+does not fight itself when the replacement also matches the pattern.
 
-1. When you run the HTA application, it starts monitoring the clipboard at regular intervals (every 2.5 seconds by default).
+Text is handed to PowerShell through a temp file rather than interpolated into
+the command line, so quotes and apostrophes in copied content cannot break it.
 
-2. It checks if the clipboard contains text that matches the regular expression specified in the configuration (`objRegEx`).
+## Caveats
 
-3. If a match is found, it replaces the matched text with the value specified in `toclip`.
-
-4. The modified text is then copied back to the clipboard.
-
-5. This process continues to run in the background as long as the HTA application is open, ensuring that any email addresses matching the pattern are automatically replaced in the clipboard.
+- Polling, not event-driven. There is a window of up to `INTERVAL_MS` where the
+  clipboard still holds the original text.
+- PowerShell startup makes each tick cost ~100 ms of CPU. Raise `INTERVAL_MS`
+  if that matters.
+- Windows only. Clipboard APIs here are WSH and PowerShell.
 
 ## License
 
-This software is provided under the [MIT License](LICENSE). You are free to use, modify, and distribute it as per the terms of the license.
-
----
-
-**Note:** Be cautious when using this tool to modify clipboard content, and ensure you comply with all applicable laws and regulations regarding data privacy and usage.
+MIT. See [LICENSE](LICENSE).
